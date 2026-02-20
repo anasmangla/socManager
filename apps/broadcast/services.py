@@ -12,8 +12,8 @@ class MessageDispatcher:
     def __init__(self, context7_client: Context7Client | None = None):
         self.context7_client = context7_client or Context7Client()
 
-    def dispatch_campaign(self, campaign: MessageCampaign) -> dict:
-        accounts = SocialAccount.objects.filter(is_active=True)
+    def dispatch_campaign(self, campaign: MessageCampaign, accounts=None) -> dict:
+        accounts = accounts if accounts is not None else SocialAccount.objects.filter(is_active=True)
         stats = {'total': accounts.count(), 'sent': 0, 'failed': 0}
 
         with transaction.atomic():
