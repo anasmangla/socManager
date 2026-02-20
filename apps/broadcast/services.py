@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from django.db import transaction
 
 from .context7 import Context7Client
 from .models import DeliveryLog, MessageCampaign, SocialAccount
+
+
+logger = logging.getLogger(__name__)
 
 
 class MessageDispatcher:
@@ -43,7 +48,7 @@ class MessageDispatcher:
             campaign.status = 'sent' if stats['failed'] == 0 else 'failed'
             campaign.save(update_fields=['status', 'updated_at'])
 
-        self.context7_client.publish_event(
+        context7_result = self.context7_client.publish_event(
             'campaign.dispatched',
             {
                 'campaign_id': campaign.id,
@@ -52,6 +57,15 @@ class MessageDispatcher:
                 'stats': stats,
             },
         )
+        if not context7_result.success:
+            logger.warning(
+                'Context7 event publish failed',
+                extra={
+                    'campaign_id': campaign.id,
+                    'status_code': context7_result.status_code,
+                    'payload': context7_result.payload,
+                },
+            )
         return stats
 
     def _send_to_provider(self, message: str, account: SocialAccount, image_url: str = '') -> tuple[bool, str, dict, str]:
