@@ -31,6 +31,21 @@ python manage.py runserver
     }
     ```
 - `POST /api/campaigns/<id>/send/` - dispatch immediately to all active accounts.
+- `POST /api/campaigns/compose-send/` - create and dispatch to selected account names + platforms.
+- `POST /api/campaigns/ai-compose/` - scan news + generate copy/image with OpenAI, then save/post as manual or automated task.
+  - Payload:
+    ```json
+    {
+      "keywords": "mortgage rates",
+      "area": "Texas",
+      "business_perspective": "We help buyers lock options confidently.",
+      "task_mode": "manual",
+      "send_at": "2026-01-01T12:00:00Z",
+      "autopost": true,
+      "account_names": ["Acme Realty"],
+      "platforms": ["facebook", "linkedin"]
+    }
+    ```
 
 ## Scheduling
 

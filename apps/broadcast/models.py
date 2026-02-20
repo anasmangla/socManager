@@ -81,6 +81,16 @@ class SocialAPICredential(models.Model):
 
 
 class MessageCampaign(models.Model):
+    SOURCE_CHOICES = [
+        ('manual', 'Manual'),
+        ('ai_news', 'AI News'),
+    ]
+
+    TASK_MODE_CHOICES = [
+        ('manual', 'Manual Task'),
+        ('automated', 'Automated Task'),
+    ]
+
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('scheduled', 'Scheduled'),
@@ -91,6 +101,10 @@ class MessageCampaign(models.Model):
 
     title = models.CharField(max_length=200)
     message = models.TextField()
+    image_url = models.URLField(blank=True)
+    source_type = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='manual')
+    task_mode = models.CharField(max_length=20, choices=TASK_MODE_CHOICES, default='manual')
+    metadata = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     send_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
