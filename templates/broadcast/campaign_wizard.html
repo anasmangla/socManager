@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social Manager - Post Wizard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    body { background: #f7f9fc; }
+    .wizard-card { max-width: 900px; margin: 30px auto; }
+    .step-pill { min-width: 130px; }
+    .step-content { min-height: 320px; }
+    .selection-card { cursor: pointer; }
+    .selection-card.active { border-color: #0d6efd; box-shadow: 0 0 0 1px #0d6efd; }
+    .platform-badge { font-size: 0.75rem; }
+    .hidden { display: none; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<div class="container py-4">
+  <div class="card wizard-card shadow-sm">
+    <div class="card-header bg-white">
+      <h4 class="mb-1">Create Social Post</h4>
+      <p class="text-muted mb-0">Friendly step-by-step flow to publish to selected accounts.</p>
+    </div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-2 mb-4" id="stepper"></div>
+      <div class="step-content" id="step-container"></div>
+      <div class="d-flex justify-content-between mt-4">
+        <button class="btn btn-outline-secondary" id="backBtn" disabled>Back</button>
+        <button class="btn btn-primary" id="nextBtn">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const state = {
+    step: 0,
+    accountNames: new Set(),
+    platforms: new Set(),
+    title: '',
+    message: '',
+    result: null,
+    accountMap: {},
+  };
+
+  const steps = ['Account', 'Social media', 'Message', 'Preview', 'Post'];
+
+  const platformLabel = {
+    x: 'X / Twitter',
+    facebook: 'Facebook',
+    instagram: 'Instagram',
+    linkedin: 'LinkedIn',
+    tiktok: 'TikTok',
+  };
+
+
+  function escapeHtml(value) {
+    return (value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  }
+
+  function getCookie(name) {
+    const cookieValue = document.cookie
+      .split('; ')
+      .find(row => row.startsWith(name + '='));
+    return cookieValue ? decodeURIComponent(cookieValue.split('=')[1]) : '';
+  }
+
+  function renderStepper() {
+    const stepper = document.getElementById('stepper');
+    stepper.innerHTML = steps.map((label, index) => {
+      const klass = index === state.step ? 'btn-primary' : index < state.step ? 'btn-success' : 'btn-outline-secondary';
+      return `<span class="btn ${klass} step-pill">${index + 1}. ${label}</span>`;
+    }).join('');
+  }
+
+  function toggleSelection(setRef, value) {
+    if (setRef.has(value)) setRef.delete(value);
+    else setRef.add(value);
+    renderCurrentStep();
+  }
+
+  async function fetchAccounts() {
+    const res = await fetch('/api/wizard/accounts/');
+    const data = await res.json();
+    state.accountMap = data.accounts || {};
+  }
+
+  function renderAccountStep() {
+    const entries = Object.entries(state.accountMap);
+    if (!entries.length) {
+      return '<div class="alert alert-warning">No active accounts found. Create social accounts in admin first.</div>';
+    }
+
+    return `
+      <h5 class="mb-3">Step 1: Select account(s) that should post</h5>
+      <div class="row g-3">
+        ${entries.map(([name, profiles]) => {
+          const selected = state.accountNames.has(name) ? 'active' : '';
+          const badges = profiles.map(p => `<span class="badge text-bg-light platform-badge me-1">${escapeHtml(platformLabel[p.platform] || p.platform)} @${escapeHtml(p.handle)}</span>`).join('');
+          return `<div class="col-md-6">
+            <div class="card selection-card ${selected}" onclick="toggleSelection(state.accountNames, '${name.replace(/'/g, "\\'")}')">
+              <div class="card-body">
+                <h6 class="mb-2">${escapeHtml(name)}</h6>
+                ${badges}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function availablePlatforms() {
+    const selected = new Set();
+    state.accountNames.forEach(name => {
+      (state.accountMap[name] || []).forEach(p => selected.add(p.platform));
+    });
+    return Array.from(selected);
+  }
+
+  function renderPlatformStep() {
+    const platforms = availablePlatforms();
+    if (!platforms.length) {
+      return '<div class="alert alert-info">Select account(s) first to choose platforms.</div>';
+    }
+    return `
+      <h5 class="mb-3">Step 2: Select where to post</h5>
+      <div class="d-flex flex-wrap gap-2">
+        ${platforms.map(code => {
+          const active = state.platforms.has(code) ? 'btn-primary' : 'btn-outline-primary';
+          return `<button class="btn ${active}" type="button" onclick="toggleSelection(state.platforms, '${code}')">${platformLabel[code] || code}</button>`;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function renderMessageStep() {
+    return `
+      <h5 class="mb-3">Step 3: Write message</h5>
+      <div class="mb-3">
+        <label class="form-label">Campaign title</label>
+        <input class="form-control" id="titleInput" maxlength="200" value="${escapeHtml(state.title)}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Message</label>
+        <textarea class="form-control" id="messageInput" rows="6">${escapeHtml(state.message)}</textarea>
+      </div>
+      <small class="text-muted">Tip: Keep it short and action-focused.</small>
+    `;
+  }
+
+  function renderPreviewStep() {
+    return `
+      <h5 class="mb-3">Step 4: Preview</h5>
+      <div class="card bg-light">
+        <div class="card-body">
+          <p class="mb-1"><strong>Accounts:</strong> ${Array.from(state.accountNames).map(escapeHtml).join(', ') || '-'}</p>
+          <p class="mb-1"><strong>Platforms:</strong> ${Array.from(state.platforms).map(p => platformLabel[p] || p).join(', ') || '-'}</p>
+          <p class="mb-1"><strong>Title:</strong> ${escapeHtml(state.title) || '-'}</p>
+          <p class="mb-1"><strong>Message:</strong></p>
+          <pre class="mb-0">${escapeHtml(state.message) || '-'}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPostStep() {
+    if (!state.result) {
+      return `
+        <h5 class="mb-3">Step 5: Post and result</h5>
+        <p class="text-muted">Click <strong>Post now</strong> to dispatch the message.</p>
+        <button class="btn btn-success" type="button" onclick="postNow()">Post now</button>
+      `;
+    }
+
+    const resultClass = state.result.status === 'sent' ? 'alert-success' : 'alert-warning';
+    return `
+      <h5 class="mb-3">Step 5: Post and result</h5>
+      <div class="alert ${resultClass}">
+        <p class="mb-1"><strong>Campaign #${state.result.campaign_id}</strong> finished with status: <strong>${escapeHtml(state.result.status)}</strong></p>
+        <p class="mb-1">Sent: ${state.result.stats.sent} / ${state.result.stats.total}</p>
+        <p class="mb-0">Failed: ${state.result.stats.failed}</p>
+      </div>
+      <h6>Targets</h6>
+      <ul>${(state.result.targets || []).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+    `;
+  }
+
+  function renderCurrentStep() {
+    renderStepper();
+    const container = document.getElementById('step-container');
+    const backBtn = document.getElementById('backBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    backBtn.disabled = state.step === 0;
+    nextBtn.classList.toggle('hidden', state.step === 4);
+
+    if (state.step === 0) container.innerHTML = renderAccountStep();
+    if (state.step === 1) container.innerHTML = renderPlatformStep();
+    if (state.step === 2) container.innerHTML = renderMessageStep();
+    if (state.step === 3) container.innerHTML = renderPreviewStep();
+    if (state.step === 4) container.innerHTML = renderPostStep();
+  }
+
+  function validateStep() {
+    if (state.step === 0 && state.accountNames.size === 0) return 'Please select at least one account.';
+    if (state.step === 1 && state.platforms.size === 0) return 'Please select at least one social media platform.';
+    if (state.step === 2) {
+      state.title = document.getElementById('titleInput').value.trim();
+      state.message = document.getElementById('messageInput').value.trim();
+      if (!state.title || !state.message) return 'Please add title and message.';
+    }
+    return '';
+  }
+
+  async function postNow() {
+    const res = await fetch('/api/campaigns/compose-send/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({
+        title: state.title,
+        message: state.message,
+        account_names: Array.from(state.accountNames),
+        platforms: Array.from(state.platforms),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Failed to post campaign');
+      return;
+    }
+    state.result = data;
+    renderCurrentStep();
+  }
+
+  document.getElementById('backBtn').addEventListener('click', () => {
+    if (state.step > 0) state.step -= 1;
+    renderCurrentStep();
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    const error = validateStep();
+    if (error) {
+      alert(error);
+      return;
+    }
+    if (state.step < 4) state.step += 1;
+    renderCurrentStep();
+  });
+
+  (async function init() {
+    await fetchAccounts();
+    renderCurrentStep();
+  })();
+</script>
+</body>
+</html>
