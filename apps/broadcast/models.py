@@ -135,3 +135,19 @@ class DeliveryLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.campaign.title} -> {self.account.handle}"
+
+
+class AuditLog(models.Model):
+    actor = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL)
+    action = models.CharField(max_length=120)
+    entity = models.CharField(max_length=120)
+    entity_id = models.PositiveIntegerField()
+    changes = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        who = self.actor.username if self.actor else 'anonymous'
+        return f'{who} {self.action} {self.entity}#{self.entity_id}'
