@@ -44,4 +44,4 @@ python manage.py dispatch_scheduled_messages
 
 - Provider integrations are intentionally stubbed in `apps/broadcast/services.py` for now.
 - Context7 is wired via `apps/broadcast/context7.py` and uses `CONTEXT7_API_KEY` / `CONTEXT7_BASE_URL`.
-- Use the Django admin (`/admin`) to create social accounts and review delivery logs.
+- Use the Django admin (`/admin`) to manage social accounts, business credentials, social API credentials, and delivery logs.
