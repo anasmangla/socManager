@@ -12,8 +12,8 @@ class SocialAccountAdmin(admin.ModelAdmin):
 
 @admin.register(MessageCampaign)
 class MessageCampaignAdmin(admin.ModelAdmin):
-    list_display = ('title', 'status', 'send_at', 'created_at', 'updated_at')
-    list_filter = ('status',)
+    list_display = ('title', 'source_type', 'task_mode', 'status', 'send_at', 'created_at', 'updated_at')
+    list_filter = ('status', 'source_type', 'task_mode')
     search_fields = ('title', 'message')
 
 

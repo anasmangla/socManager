@@ -43,6 +43,14 @@
     title: '',
     message: '',
     result: null,
+    composeMode: 'manual',
+    keywords: '',
+    area: '',
+    businessPerspective: '',
+    taskMode: 'manual',
+    sendAt: '',
+    imageUrl: '',
+    aiArticles: [],
     accountMap: {},
   };
 
@@ -141,6 +149,42 @@
     return `
       <h5 class="mb-3">Step 3: Write message</h5>
       <div class="mb-3">
+        <label class="form-label">Compose mode</label>
+        <div class="btn-group w-100" role="group">
+          <button class="btn ${state.composeMode === 'manual' ? 'btn-primary' : 'btn-outline-primary'}" type="button" onclick="setComposeMode('manual')">Manual</button>
+          <button class="btn ${state.composeMode === 'ai' ? 'btn-primary' : 'btn-outline-primary'}" type="button" onclick="setComposeMode('ai')">AI from news</button>
+        </div>
+      </div>
+      ${state.composeMode === 'ai' ? `
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Keywords *</label>
+            <input class="form-control" id="keywordsInput" value="${escapeHtml(state.keywords)}" placeholder="solar grants, property market, cybersecurity...">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Area</label>
+            <input class="form-control" id="areaInput" value="${escapeHtml(state.area)}" placeholder="Chicago, Texas, UK...">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Business perspective</label>
+          <textarea class="form-control" id="perspectiveInput" rows="3" placeholder="How should your business position the update?">${escapeHtml(state.businessPerspective)}</textarea>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Task mode</label>
+            <select class="form-select" id="taskModeInput">
+              <option value="manual" ${state.taskMode === 'manual' ? 'selected' : ''}>Manual task (generate draft)</option>
+              <option value="automated" ${state.taskMode === 'automated' ? 'selected' : ''}>Automated task</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Schedule (for automated)</label>
+            <input class="form-control" id="sendAtInput" type="datetime-local" value="${escapeHtml(state.sendAt)}">
+          </div>
+        </div>
+      ` : ''}
+      <div class="mb-3">
         <label class="form-label">Campaign title</label>
         <input class="form-control" id="titleInput" maxlength="200" value="${escapeHtml(state.title)}">
       </div>
@@ -157,8 +201,12 @@
       <h5 class="mb-3">Step 4: Preview</h5>
       <div class="card bg-light">
         <div class="card-body">
+          <p class="mb-1"><strong>Compose mode:</strong> ${state.composeMode === 'ai' ? 'AI from news' : 'Manual'}</p>
           <p class="mb-1"><strong>Accounts:</strong> ${Array.from(state.accountNames).map(escapeHtml).join(', ') || '-'}</p>
           <p class="mb-1"><strong>Platforms:</strong> ${Array.from(state.platforms).map(p => platformLabel[p] || p).join(', ') || '-'}</p>
+          ${state.composeMode === 'ai' ? `<p class="mb-1"><strong>Keywords:</strong> ${escapeHtml(state.keywords) || '-'}</p>
+          <p class="mb-1"><strong>Area:</strong> ${escapeHtml(state.area) || '-'}</p>
+          <p class="mb-1"><strong>Task mode:</strong> ${escapeHtml(state.taskMode)}</p>` : ''}
           <p class="mb-1"><strong>Title:</strong> ${escapeHtml(state.title) || '-'}</p>
           <p class="mb-1"><strong>Message:</strong></p>
           <pre class="mb-0">${escapeHtml(state.message) || '-'}</pre>
@@ -184,9 +232,16 @@
         <p class="mb-1">Sent: ${state.result.stats.sent} / ${state.result.stats.total}</p>
         <p class="mb-0">Failed: ${state.result.stats.failed}</p>
       </div>
+      ${state.result.image_url ? `<p><strong>Generated image:</strong> <a href="${escapeHtml(state.result.image_url)}" target="_blank">Open image</a></p>` : ''}
       <h6>Targets</h6>
       <ul>${(state.result.targets || []).map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+      ${(state.result.articles || []).length ? `<h6>News scanned</h6><ul>${state.result.articles.map(item => `<li><a href="${escapeHtml(item.link)}" target="_blank">${escapeHtml(item.title)}</a></li>`).join('')}</ul>` : ''}
     `;
+  }
+
+  function setComposeMode(mode) {
+    state.composeMode = mode;
+    renderCurrentStep();
   }
 
   function renderCurrentStep() {
@@ -209,26 +264,46 @@
     if (state.step === 0 && state.accountNames.size === 0) return 'Please select at least one account.';
     if (state.step === 1 && state.platforms.size === 0) return 'Please select at least one social media platform.';
     if (state.step === 2) {
+      state.keywords = document.getElementById('keywordsInput') ? document.getElementById('keywordsInput').value.trim() : state.keywords;
+      state.area = document.getElementById('areaInput') ? document.getElementById('areaInput').value.trim() : state.area;
+      state.businessPerspective = document.getElementById('perspectiveInput') ? document.getElementById('perspectiveInput').value.trim() : state.businessPerspective;
+      state.taskMode = document.getElementById('taskModeInput') ? document.getElementById('taskModeInput').value : state.taskMode;
+      state.sendAt = document.getElementById('sendAtInput') ? document.getElementById('sendAtInput').value : state.sendAt;
       state.title = document.getElementById('titleInput').value.trim();
       state.message = document.getElementById('messageInput').value.trim();
-      if (!state.title || !state.message) return 'Please add title and message.';
+      if (state.composeMode === 'manual' && (!state.title || !state.message)) return 'Please add title and message.';
+      if (state.composeMode === 'ai' && !state.keywords) return 'Please add keywords for AI news scan.';
     }
     return '';
   }
 
   async function postNow() {
-    const res = await fetch('/api/campaigns/compose-send/', {
+    const endpoint = state.composeMode === 'ai' ? '/api/campaigns/ai-compose/' : '/api/campaigns/compose-send/';
+    const payload = state.composeMode === 'ai'
+      ? {
+          keywords: state.keywords,
+          area: state.area,
+          business_perspective: state.businessPerspective,
+          task_mode: state.taskMode,
+          send_at: state.sendAt || null,
+          autopost: true,
+          account_names: Array.from(state.accountNames),
+          platforms: Array.from(state.platforms),
+        }
+      : {
+          title: state.title,
+          message: state.message,
+          account_names: Array.from(state.accountNames),
+          platforms: Array.from(state.platforms),
+        };
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': getCookie('csrftoken'),
       },
-      body: JSON.stringify({
-        title: state.title,
-        message: state.message,
-        account_names: Array.from(state.accountNames),
-        platforms: Array.from(state.platforms),
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) {

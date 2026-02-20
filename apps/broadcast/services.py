@@ -22,7 +22,11 @@ class MessageDispatcher:
 
             for account in accounts:
                 # Placeholder for real provider adapters (Meta API, X API, LinkedIn API, etc.)
-                success, provider_message_id, payload, error_message = self._send_to_provider(campaign.message, account)
+                success, provider_message_id, payload, error_message = self._send_to_provider(
+                    campaign.message,
+                    account,
+                    image_url=campaign.image_url,
+                )
                 DeliveryLog.objects.create(
                     campaign=campaign,
                     account=account,
@@ -50,7 +54,12 @@ class MessageDispatcher:
         )
         return stats
 
-    def _send_to_provider(self, message: str, account: SocialAccount) -> tuple[bool, str, dict, str]:
+    def _send_to_provider(self, message: str, account: SocialAccount, image_url: str = '') -> tuple[bool, str, dict, str]:
         # Stubbed provider behavior for now.
-        payload = {'platform': account.platform, 'handle': account.handle, 'preview': message[:100]}
+        payload = {
+            'platform': account.platform,
+            'handle': account.handle,
+            'preview': message[:100],
+            'image_url': image_url,
+        }
         return True, f'{account.platform}-{account.id}', payload, ''

@@ -8,4 +8,5 @@ urlpatterns = [
     path('campaigns/', views.create_campaign, name='create_campaign'),
     path('campaigns/<int:campaign_id>/send/', views.send_campaign, name='send_campaign'),
     path('campaigns/compose-send/', views.compose_and_send_campaign, name='compose_and_send_campaign'),
+    path('campaigns/ai-compose/', views.ai_compose_campaign, name='ai_compose_campaign'),
 ]

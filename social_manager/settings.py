@@ -78,3 +78,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Context7 integration configuration
 CONTEXT7_BASE_URL = os.getenv('CONTEXT7_BASE_URL', 'https://api.context7.com')
 CONTEXT7_API_KEY = os.getenv('CONTEXT7_API_KEY', '')
+
+# OpenAI integration configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
+OPENAI_IMAGE_MODEL = os.getenv('OPENAI_IMAGE_MODEL', 'gpt-image-1')
