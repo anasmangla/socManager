@@ -103,8 +103,13 @@
 
   async function fetchAccounts() {
     const res = await fetch('/api/wizard/accounts/');
-    const data = await res.json();
-    state.accountMap = data.accounts || {};
+    const payload = await res.json();
+    if (!res.ok || payload.status !== 'success') {
+      setFeedback(payload.message || 'Unable to load accounts.');
+      state.accountMap = {};
+      return;
+    }
+    state.accountMap = payload.data.accounts || {};
   }
 
   function renderAccountStep() {
@@ -316,13 +321,13 @@
       },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setFeedback(data.error || 'Failed to post campaign');
+    const payload = await res.json();
+    if (!res.ok || payload.status !== 'success') {
+      setFeedback(payload.message || 'Failed to post campaign');
       return;
     }
-    setFeedback('Campaign posted successfully.', 'success');
-    state.result = data;
+    setFeedback(payload.message || 'Campaign posted successfully.', 'success');
+    state.result = payload.data || {};
     renderCurrentStep();
   }
 
